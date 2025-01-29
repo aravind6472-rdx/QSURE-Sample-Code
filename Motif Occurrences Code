@@ -1,0 +1,53 @@
+#counting the total number of occurnces of 3 node motifs 
+
+import networkx as nx
+import pandas as pd
+from networkx.algorithms import isomorphism
+
+edge_list = pd.read_csv('/Users/aravindbandreddi/Downloads/hela.csv')
+edges = edge_list[["from_name","to_name"]].values.tolist() #this is a list of lists containing a from_node and to_node
+G = nx.Graph() #creates an undirected graph so A to B counts as the same as B to A 
+G.add_edges_from(edges) #adds the edges defined in the edges list to the graph 
+
+def extract_unique_nodes(graph, pattern):
+    matcher = isomorphism.GraphMatcher(graph, pattern)
+    matches = list(matcher.subgraph_isomorphisms_iter())
+    
+    unique_matches = []
+    for match in matches:
+        node_set = set(match.keys())
+        if node_set not in unique_matches:
+            unique_matches.append(node_set)
+    
+    unique_nodes = set()
+    for node_set in unique_matches:
+        unique_nodes.update(node_set)
+    
+    return (unique_nodes)
+
+pattern_222 = nx.Graph([(1, 2), (2, 3), (1, 3)])
+unique_nodes_222 = extract_unique_nodes(G, pattern_222)
+
+pattern_211 = nx.Graph([(1, 2), (2, 3)])
+unique_nodes_211 = extract_unique_nodes(G, pattern_211)
+
+num_swaps = G.number_of_edges()*5
+rand_frequencies = []
+
+for i in range(500):
+    G_swapped = nx.double_edge_swap(G,nswap=num_swaps,max_tries=num_swaps*10)
+    rand_frequency_count = extract_unique_nodes(G_swapped,pattern_222)
+    rand_frequencies.append(rand_frequency_count) 
+mean_count = mean(rand_frequencies)
+print(mean_count)
+
+count = 0
+for i in range(len(rand_frequencies)):
+    if rand_frequencies[i]>=og_motif_count:
+        count+=1
+        
+p_value = count/500 
+
+print(f"The total count of 211 in the orginal network is {og_motif_count_211}")
+print(f"The total count of 222 in the orginal network is {og_motif_count_222}")
+print(f"The p value for 3 node motifs is {p_value}")
