@@ -1,0 +1,113 @@
+import re
+import networkx as nx
+import pandas as pd
+from networkx.algorithms import isomorphism
+
+# Load the network edge list from a CSV file
+# This file contains interactions between genes or proteins
+edge_list = pd.read_csv('/Users/aravindbandreddi/Downloads/hela.csv')
+
+# Extract the "from" and "to" columns to represent edges in the network
+edges = edge_list[["from_name", "to_name"]].values.tolist()
+
+# Create an undirected graph using NetworkX
+G = nx.Graph()
+G.add_edges_from(edges)  # Add edges to the graph
+
+# Function to extract unique nodes involved in a given motif pattern
+def extract_unique_nodes(graph, pattern):
+    # Use NetworkX's GraphMatcher to find subgraph isomorphisms
+    matcher = isomorphism.GraphMatcher(graph, pattern)
+    matches = list(matcher.subgraph_isomorphisms_iter())
+    
+    # Store unique node sets found in the matches
+    unique_matches = []
+    for match in matches:
+        node_set = set(match.keys())
+        if node_set not in unique_matches:
+            unique_matches.append(node_set)
+    
+    # Collect all unique nodes from matched subgraphs
+    unique_nodes = set()
+    for node_set in unique_matches:
+        unique_nodes.update(node_set)
+    
+    return unique_nodes
+
+# Define specific motif patterns and extract unique nodes involved
+# Each pattern represents a specific motif structure being studied in the network
+
+# 3-node motif patterns
+pattern_211 = nx.Graph([(1, 2), (2, 3)])
+unique_nodes_211 = extract_unique_nodes(G, pattern_211)
+
+# 4-node motif patterns
+pattern_3221 = nx.Graph([(3,2), (1,2), (2,4), (4,3)])
+unique_nodes_3221 = extract_unique_nodes(G, pattern_3221)
+
+# Load gene location data from a CSV file
+location_list = pd.read_csv('/Users/aravindbandreddi/Downloads/gene_locations.csv')
+
+# Extract relevant columns (chromosome, gene location, and gene name)
+locations = location_list[["chromosome", "gene_location", "gene_name"]].values.tolist()
+
+# Function to parse chromosome location from the given format
+def parse_chromosome_location(location):
+    # Match location patterns in the format "chrX:start-end"
+    match = re.match(r'chr(\w+):(\d+)-(\d+)', location)  
+    # \w+ captures the chromosome name (number or X/Y)
+    # \d+ captures the start and end positions
+
+    if match:
+        chromosome = match.group(1)
+        start = int(match.group(2))
+        end = int(match.group(3))
+        return chromosome, start, end
+    
+    return None  # Return None if the location format doesn't match
+
+# Function to find the closest gene to each chromosome location in the motif nodes
+def find_closest_genes(chromosome_locations, gene_locations):
+    parsed_chromosome = []
+
+    # Parse each chromosome location into (chromosome number, start, end)
+    for i in chromosome_locations:
+        parsed = parse_chromosome_location(i)
+        if parsed:
+            parsed_chromosome.append(parsed)
+
+    closest_genes = []
+
+    for chromosome, start, end in parsed_chromosome:
+        min_distance = float('inf')  # Initialize min_distance as infinity
+        closest_gene = None  # Variable to store the closest gene
+        relevant_genes = []  # List to store genes from the same chromosome
+
+        # Filter gene locations to include only those on the same chromosome
+        for i in gene_locations:
+            if i[0] == 'chr' + chromosome:  # Ensure we are comparing the same chromosome
+                relevant_genes.append((i[1], i[2]))  # (gene_position, gene_name)
+        
+        # Iterate through all genes on the same chromosome
+        for gene_position, gene_name in relevant_genes:
+            # Compute distance to the motif region (smallest difference to start or end)
+            distance = min(abs(start - gene_position), abs(end - gene_position))
+            
+            # Update the closest gene if a smaller distance is found
+            if distance < min_distance:
+                min_distance = distance
+                closest_gene = (gene_name, gene_position)
+        
+        # Store the closest gene and its position if found
+        if closest_gene:
+            closest_genes.append([
+                "chr" + chromosome + ":" + str(start) + "-" + str(end),  # Original region
+                closest_gene[0],  # Closest gene name
+                closest_gene[1]   # Closest gene position
+            ])
+
+    return closest_genes
+
+# Find the closest genes for each motif pattern
+closest_genes_211 = find_closest_genes(list(unique_nodes_211), locations)
+closest_genes_3221 = find_closest_genes(list(unique_nodes_3221), locations)
