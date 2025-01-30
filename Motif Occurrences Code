@@ -1,4 +1,4 @@
-#counting the total number of occurnces of 3 node motifs and assesing the statistical significance
+#counting the total number of occurences of 3 node motifs and assesing the statistical significance
 import networkx as nx
 import pandas as pd
 from networkx.algorithms import isomorphism
