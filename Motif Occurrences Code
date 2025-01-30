@@ -1,30 +1,28 @@
 #counting the total number of occurnces of 3 node motifs and assesing the statistical significance
-
 import networkx as nx
 import pandas as pd
 from networkx.algorithms import isomorphism
 
 edge_list = pd.read_csv('/Users/aravindbandreddi/Downloads/hela.csv')
 edges = edge_list[["from_name","to_name"]].values.tolist() #this is a list of lists containing a from_node and to_node
-G = nx.Graph() #creates an undirected graph so A to B counts as the same as B to A 
-G.add_edges_from(edges) #adds the edges defined in the edges list to the graph 
-
+G = nx.Graph()
+G.add_edges_from(edges)  #Construct the graph from the given edge list above.
 def count_motifs(graph):
-    
+    #Define the shape of the 3-node motif being looked for (211 here)
     pattern_211 = nx.Graph()
     pattern_211.add_edges_from([(1, 2), (2, 3)])
-    
+    #Find all the subgraphs that match the pattern 211
     graph_match_211 = isomorphism.GraphMatcher(graph, pattern_211)
     matches_211 = list(graph_match_211.subgraph_isomorphisms_iter())
-    
-    encountered_keys = []
-    unique_dicts_211 = []
+    #Extract unique instances of the motif
+    encountered_keys = []  #Stores node sets to track unique occurrences
+    unique_dicts_211 = []  #Stores unique motif mappings
     for d in matches_211:
-        keys_set = set(d.keys())
-        if keys_set not in encountered_keys:
+        keys_set = set(d.keys())  #Convert match dictionary to a set of node keys
+        if keys_set not in encountered_keys:  #Avoid counting duplicate motifs
             unique_dicts_211.append(d)
             encountered_keys.append(keys_set)
-    pattern_count_211 = len(unique_dicts_211)
+    pattern_count_211 = len(unique_dicts_211)  #Total occurrences of pattern_211
 
     pattern_222 = nx.Graph()
     pattern_222.add_edges_from([(1, 2), (2, 3), (1, 3)])
@@ -40,26 +38,22 @@ def count_motifs(graph):
             unique_dicts_222.append(d)
             encountered_keys.append(keys_set)
     pattern_count_222 = len(unique_dicts_222)
-
     return pattern_count_211 + pattern_count_222
 
-og_motif_count = count_motifs(G) #original motif count 
+og_motif_count = count_motifs(G)#Compute motif occurrences in the original network 
+#Define the number of edge swaps for randomization
+num_swaps = G.number_of_edges() * 5  #Typically 5x the number of edges
+rand_frequencies = []  #Stores motif counts for randomized networks
 
-num_swaps = G.number_of_edges()*5
-rand_frequencies = []
-
+#Generate 500 randomized versions of the network by swapping edges
 for i in range(500):
-    G_swapped = nx.double_edge_swap(G,nswap=num_swaps,max_tries=num_swaps*8)   
-    rand_frequency_count = count_motifs(G_swapped)
-    rand_frequencies.append(rand_frequency_count)   
+    G_swapped = nx.double_edge_swap(G, nswap=num_swaps, max_tries=num_swaps * 8)  #Permutes edges
+    rand_frequency_count = count_motifs(G_swapped) #Count motifs in randomized network
+    rand_frequencies.append(rand_frequency_count)
 
-count = 0
+#Compute the p-value (statistical significance of motif enrichment)
+count = 0  
 for i in range(len(rand_frequencies)):
-    if rand_frequencies[i]>=og_motif_count:
-        count+=1
-        
-p_value = count/500 
-
-print(og_motif_count)
-
-print(f"The p value is {p_value}")
+    if rand_frequencies[i] >= og_motif_count:
+        count += 1
+p_value = count / 500  #Compute the proportion of randomized networks with as many motifs as the original
